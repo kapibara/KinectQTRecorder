@@ -1,9 +1,9 @@
 
 set(EXEC recorder)
 
-set(SOURCE main.cpp qmainwindow.cpp qvideowidget.cpp qvideosurface.cpp kinectmotor.cpp qvideosource.cpp qsettingswindow.cpp framerecorder.cpp)
+set(SOURCE main.cpp qmainwindow.cpp qvideowidget.cpp qvideosurface.cpp kinectmotor.cpp qvideosource.cpp qsettingswindow.cpp imagerecorder.cpp)
 
-set(QT_HEADERS ../include/qmainwindow.h ../include/qvideosurface.h ../include/qvideowidget.h ../include/qvideosource.h ../include/framerecorder.h ../include/qsettingswindow.h)
+set(QT_HEADERS ../include/qmainwindow.h ../include/qvideosurface.h ../include/qvideowidget.h ../include/qvideosource.h ../include/qsettingswindow.h ../include/imagerecorder.h)
 set(ST_HEADERS ../include/kinectmotor.h )
 
 QT5_WRAP_CPP(QT_HEADERS_MOC ${QT_HEADERS}) #run MOC

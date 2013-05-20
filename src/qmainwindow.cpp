@@ -1,4 +1,5 @@
 #include "qmainwindow.h"
+#include "imagerecorder.h"
 
 #include <QApplication>
 #include <QBoxLayout>
@@ -54,7 +55,8 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     vsource_ = new QVideoSource(lock_,pause_);
 
     locBufferRGB_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
-    locBufferDepth_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
+    locBufferGrey_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
+    locBufferDepth_ = new unsigned short[vsource_->getFrameWidth()*vsource_->getFrameHeight()];
 
     QBoxLayout *vlayout = new QBoxLayout(QBoxLayout::LeftToRight); //videos
 
@@ -138,18 +140,27 @@ void QMainWindow::onNewFrame()
     lock_.lock();
 
        memcpy(locBufferRGB_,vsource_->getRGBBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
-       memcpy(locBufferDepth_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
+       memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight());
+       memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
 
        lastRGB_ = QImage(locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
-       lastDepth_ = QImage(locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
-
-       if (currentCounter_ > 0){
-           lastRGB_.save(currentPath_ + "imRGB" + QString::number(currentCounter_) + ".png");
-           lastDepth_.save(currentPath_ + "imDepth" + QString::number(currentCounter_) + ".png");
-           currentCounter_--;
-       }
+       lastDepth_ = QImage(locBufferGrey_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
 
     lock_.unlock();
+
+    if (currentCounter_ > 0){
+
+        lastDepth_.save(currentPath_ + "/imDepth" + QString::number(currentCounter_) + ".png");
+
+        QString path = currentPath_ +  "/ImDepthOrig" + QString::number(currentCounter_) + ".png";
+        ImageRecorder::saveDepth(path.toLatin1().data(),locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
+
+        path = currentPath_ + "/ImRGB" + QString::number(currentCounter_) + ".png";
+
+        ImageRecorder::saveRGB(path.toLatin1().data(),locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
+
+        currentCounter_--;
+    }
 
     QVideoFrame rgbFrame(lastRGB_);
     QVideoFrame depthFrame(lastDepth_);

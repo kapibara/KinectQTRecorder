@@ -19,7 +19,7 @@ public:
 
     uchar* getRGBBuffer() {return rgbdataptr_;}
     uchar* getScaledDepthBuffer() {return depthdataptr_;}
-    uchar* getOriginalDepthBuffer() {return depthBuffer_.data;} //invalid - do not use
+    unsigned short* getOriginalDepthBuffer() {return depthoriginal_;}
 
     int getFrameWidth() {return width_;}
     int getFrameHeight() {return height_;}
@@ -43,6 +43,7 @@ private:
     cv::Mat depthBuffer_; //receive depth data
     cv::Mat bgrBuffer_; //receive bgr data
 
+    unsigned short *depthoriginal_; //original depth data
     uchar *depthdataptr_; //ready-to-show-depth
     uchar *rgbdataptr_; //ready-to-show-rgb
 

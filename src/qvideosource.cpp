@@ -19,6 +19,7 @@ QVideoSource::QVideoSource(QMutex &lock, bool &pause): device_(CV_CAP_OPENNI),MA
 
     depthdataptr_ = new uchar[width_*height_*3];
     rgbdataptr_ = new uchar[width_*height_*3];
+    depthoriginal_ = new unsigned short[width_*height_];
 
 }
 
@@ -114,6 +115,7 @@ void QVideoSource::convertColor()
             rgbdataptr_[3*j+3*i*colcount] = bgrdataptr[3*j+2];
             rgbdataptr_[3*j+1+3*i*colcount] = bgrdataptr[3*j+1];
             rgbdataptr_[3*j+2+3*i*colcount] = bgrdataptr[3*j];
+            depthoriginal_[j+i*colcount] = idataptr[j];
         }
     }
 }

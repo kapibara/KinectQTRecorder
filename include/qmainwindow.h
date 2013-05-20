@@ -44,7 +44,8 @@ private:
     QMutex lock_;
 
     uchar *locBufferRGB_;
-    uchar *locBufferDepth_;
+    uchar *locBufferGrey_;
+    unsigned short *locBufferDepth_;
 
     QString currentPath_;
     QString basePath_;
