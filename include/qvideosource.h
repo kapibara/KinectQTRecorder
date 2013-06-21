@@ -27,6 +27,7 @@ public:
     void run();
     void pause();
     void resume();
+
 signals:
     /*if we sit in a separate slot, can be connected in a standard way, i.e. quied (no other way around)
       do not use in the same thread with queueing - it is emited from an infinite loop ->
