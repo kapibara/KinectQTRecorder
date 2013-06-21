@@ -1,6 +1,7 @@
 #include "qmainwindow.h"
 #include "imagerecorder.h"
 #include "kinectcalibration.h"
+#include "intelvideosource.h"
 
 #include <QApplication>
 #include <QBoxLayout>
@@ -18,7 +19,6 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     framesCounter_ = 5;
     basePath_ = ".";
 
-
     totalCounter_ = 0;
     currentCounter_ = 0;
 
@@ -31,7 +31,7 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     settings_ = new QPushButton();
     settings_->setText(tr("Settings"));
 
-    motor_ = new KinectMotor();
+    //motor_ = new KinectMotor();
 
     settingsWindow_ = new QSettingsWindow(this,framesCounter_,basePath_);
     settingsWindow_->setModal(true);
@@ -41,7 +41,7 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     camPos_->setSingleStep(1);
 
     camPos_->setValue(0);
-
+/*
     while(!motor_->open())
     {
         if(motor_->isNoDeviceError()){
@@ -49,15 +49,20 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
             exit(-1);
         }
         motor_->move(0);
-//        sleep(1);
-    }
+        sleep(1);
+    }*/
 
     pause_ = false;
-    vsource_ = new QVideoSource(lock_,pause_);
 
-    locBufferRGB_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
-    locBufferGrey_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
-    locBufferDepth_ = new unsigned short[vsource_->getFrameWidth()*vsource_->getFrameHeight()];
+    try{
+        vsource_ = new QIntelVideoSource(lock_,pause_);
+    }catch(IntelCameraException e){
+        cout << e << endl;
+    }
+
+    locBufferRGB_ = new uchar[vsource_->frameWidth(IntelVideoSource::IMAGE_RGB)*vsource_->frameHeight(IntelVideoSource::IMAGE_RGB)*3];
+    locBufferGrey_ = new uchar[vsource_->frameWidth(IntelVideoSource::IMAGE_DEPTH)*vsource_->frameHeight(IntelVideoSource::IMAGE_DEPTH)*3];
+    locBufferDepth_ = new unsigned short[vsource_->frameWidth(IntelVideoSource::IMAGE_DEPTH)*vsource_->frameHeight(IntelVideoSource::IMAGE_DEPTH)];
 
     QBoxLayout *vlayout = new QBoxLayout(QBoxLayout::LeftToRight); //videos
 
@@ -80,7 +85,7 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     resize(QSize(1280,600));
 
     connect(record_,SIGNAL(clicked()),this,SLOT(onRecord()));
-    connect(camPos_,SIGNAL(valueChanged(int)),this,SLOT(onSliderMove(int)));
+    //connect(camPos_,SIGNAL(valueChanged(int)),this,SLOT(onSliderMove(int)));
     connect(vsource_,SIGNAL(framesReady()),this,SLOT(onNewFrame()));
     connect(settings_,SIGNAL(clicked()),this,SLOT(onSettingsClick()));
 
@@ -140,12 +145,12 @@ void QMainWindow::onNewFrame()
 
     lock_.lock();
 
-       memcpy(locBufferRGB_,vsource_->getRGBBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
-       memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*sizeof(short));
-       memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
+       memcpy(locBufferRGB_,vsource_->getRGBBuffer(),vsource_->frameWidth(IntelVideoSource::IMAGE_RGB)*vsource_->frameHeight(IntelVideoSource::IMAGE_RGB)*3);
+       memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->frameWidth(IntelVideoSource::IMAGE_DEPTH)*vsource_->frameHeight(IntelVideoSource::IMAGE_DEPTH)*2);
+       memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->frameWidth(IntelVideoSource::IMAGE_DEPTH)*vsource_->frameHeight(IntelVideoSource::IMAGE_DEPTH)*3);
 
-       lastRGB_ = QImage(locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
-       lastDepth_ = QImage(locBufferGrey_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
+       lastRGB_ = QImage(locBufferRGB_,vsource_->frameWidth(IntelVideoSource::IMAGE_RGB),vsource_->frameHeight(IntelVideoSource::IMAGE_RGB),QImage::Format_RGB888);
+       lastDepth_ = QImage(locBufferGrey_,vsource_->frameWidth(IntelVideoSource::IMAGE_DEPTH),vsource_->frameHeight(IntelVideoSource::IMAGE_DEPTH),QImage::Format_RGB888);
 
     lock_.unlock();
 
@@ -154,11 +159,11 @@ void QMainWindow::onNewFrame()
         lastDepth_.save(currentPath_ + "/imDepth" + QString::number(currentCounter_) + ".png");
 
         QString path = currentPath_ +  "/ImDepthOrig" + QString::number(currentCounter_) + ".png";
-        ImageRecorder::saveDepth(path.toLatin1().data(),locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
+        ImageRecorder::saveDepth(path.toLatin1().data(),locBufferDepth_,vsource_->frameWidth(IntelVideoSource::IMAGE_DEPTH),vsource_->frameHeight(IntelVideoSource::IMAGE_DEPTH));
 
         path = currentPath_ + "/ImRGB" + QString::number(currentCounter_) + ".png";
 
-        ImageRecorder::saveRGB(path.toLatin1().data(),locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
+        ImageRecorder::saveRGB(path.toLatin1().data(),locBufferRGB_,vsource_->frameWidth(IntelVideoSource::IMAGE_RGB),vsource_->frameHeight(IntelVideoSource::IMAGE_RGB));
 
         currentCounter_--;
     }

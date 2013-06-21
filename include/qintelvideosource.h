@@ -20,10 +20,10 @@ public:
 
     uchar* getRGBBuffer() {return rgbdataptr_;}
     uchar* getScaledDepthBuffer() {return depthdataptr_;}
-    unsigned short* getOriginalDepthBuffer() {return depthoriginal_;}
+    unsigned short* getOriginalDepthBuffer() {return depthshortptr_;}
 
-    int frameHeight(IntelVideoSource::ImageType type) {return device_.height(type);}
-    int frameWidth(IntelVideoSource::ImageType type) {return device_.width(type);}
+    int frameHeight(IntelVideoSource::ImageType type) {return device_->height(type);}
+    int frameWidth(IntelVideoSource::ImageType type) {return device_->width(type);}
 
     void run();
     void pause();
@@ -41,11 +41,15 @@ private:
 
     QWaitCondition pauseCond_;
 
-    IntelVideoSource device_;
+    IntelVideoSource *device_;
 
     uchar *depthoriginal_; //original depth data
+    uchar *rgboriginal_; //original RGB data
+
     uchar *depthdataptr_; //ready-to-show-depth
     uchar *rgbdataptr_; //ready-to-show-rgb
+
+    unsigned short *depthshortptr_;
 
     bool pause_;
 

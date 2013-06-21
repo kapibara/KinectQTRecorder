@@ -8,7 +8,7 @@
 
 #include "qvideowidget.h"
 #include "kinectmotor.h"
-#include "qvideosource.h"
+#include "qintelvideosource.h"
 #include "qsettingswindow.h"
 
 class QMainWindow : public QWidget
@@ -34,7 +34,7 @@ private:
     QAbstractButton *settings_;
     QSettingsWindow *settingsWindow_;
 
-    QVideoSource *vsource_;
+    QIntelVideoSource *vsource_;
 
     KinectMotor *motor_;
 
