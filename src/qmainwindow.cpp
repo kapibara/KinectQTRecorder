@@ -1,6 +1,5 @@
 #include "qmainwindow.h"
 #include "imagerecorder.h"
-#include "kinectcalibration.h"
 
 #include <QApplication>
 #include <QBoxLayout>
