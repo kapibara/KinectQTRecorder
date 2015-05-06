@@ -17,7 +17,7 @@ QSettingsWindow::QSettingsWindow(QWidget *parent, int defFrameCount, QString def
     spinBox_ = new QSpinBox();
     spinBox_->setValue(frameCount_);
     spinBox_->setSizePolicy(QSizePolicy::Fixed,QSizePolicy::Fixed);
-    spinBox_->setMaximum(10);
+    spinBox_->setMaximum(500);
     spinBox_->setMinimum(1);
 
     selectPath_ = new QPushButton("Change");

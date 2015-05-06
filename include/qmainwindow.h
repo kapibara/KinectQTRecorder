@@ -5,17 +5,21 @@
 #include <QSlider>
 #include <QImage>
 #include <QAbstractButton>
+#include <QShortcut>
 
 #include "qvideowidget.h"
 #include "kinectmotor.h"
 #include "qvideosource.h"
 #include "qsettingswindow.h"
+#include "badimagedetector.h"
+#include "screenshotdisplay.h"
+#include "resourcestorage.h"
 
 class QMainWindow : public QWidget
 {
     Q_OBJECT
 public:
-    explicit QMainWindow(QWidget *parent = 0);
+    explicit QMainWindow(ResourceStorage &s,QWidget *parent = 0);
 
 signals:
 
@@ -33,6 +37,10 @@ private:
     QAbstractButton *record_;
     QAbstractButton *settings_;
     QSettingsWindow *settingsWindow_;
+    QShortcut *shortcut_;
+
+    BadImageDetector *detector_;
+    QScreenshotDisplay *screenshotDisplay_;
 
     QVideoSource *vsource_;
 

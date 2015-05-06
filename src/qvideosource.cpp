@@ -109,9 +109,15 @@ void QVideoSource::convertColor()
         bgrdataptr = bgrBuffer_.ptr(i);
 
         for(int j=0; j<colcount; j++){
-            depthdataptr_[3*j+3*i*colcount] = idataptr[j]/MAX_DEPTH*256.0;
-            depthdataptr_[3*j+1+3*i*colcount] = idataptr[j]/MAX_DEPTH*256.0;
-            depthdataptr_[3*j+2+3*i*colcount] = idataptr[j]/MAX_DEPTH*256.0;
+            if(idataptr[j]>0){
+                depthdataptr_[3*j+3*i*colcount] = idataptr[j]/MAX_DEPTH*255.0;
+                depthdataptr_[3*j+1+3*i*colcount] = idataptr[j]/MAX_DEPTH*255.0;
+                depthdataptr_[3*j+2+3*i*colcount] = idataptr[j]/MAX_DEPTH*255.0;
+            }else{
+                depthdataptr_[3*j+3*i*colcount] = 255;
+                depthdataptr_[3*j+1+3*i*colcount] = 0;
+                depthdataptr_[3*j+2+3*i*colcount] = 0;
+            }
             rgbdataptr_[3*j+3*i*colcount] = bgrdataptr[3*j+2];
             rgbdataptr_[3*j+1+3*i*colcount] = bgrdataptr[3*j+1];
             rgbdataptr_[3*j+2+3*i*colcount] = bgrdataptr[3*j];

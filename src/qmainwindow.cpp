@@ -11,12 +11,11 @@
 
 using namespace std;
 
-QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
+QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
 {
     /*default values*/
     framesCounter_ = 5;
-    basePath_ = ".";
-
+    basePath_ = QDir::currentPath();
 
     totalCounter_ = 0;
     currentCounter_ = 0;
@@ -35,12 +34,21 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     settingsWindow_ = new QSettingsWindow(this,framesCounter_,basePath_);
     settingsWindow_->setModal(true);
 
+    screenshotDisplay_ = new QScreenshotDisplay(s.getResourceLocation(),this);
+    screenshotDisplay_->setModal(true);
+
     camPos_ = new QSlider(Qt::Horizontal,this);
     camPos_->setRange(-31,31);
     camPos_->setSingleStep(1);
 
+    shortcut_ = new QShortcut(this);
+    shortcut_->setKey(Qt::Key_Tab);
+
     camPos_->setValue(0);
 
+    detector_ = new BadImageDetector();
+
+/*
     while(!motor_->open())
     {
         if(motor_->isNoDeviceError()){
@@ -49,7 +57,7 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
         }
         motor_->move(0);
 //        sleep(1);
-    }
+    }*/
 
     pause_ = false;
     vsource_ = new QVideoSource(lock_,pause_);
@@ -75,13 +83,14 @@ QMainWindow::QMainWindow(QWidget *parent): QWidget(parent)
     mlayout->addLayout(clayout);
 
     setLayout(mlayout);
-    setWindowTitle(tr("Basic Video Recorder"));
+    setWindowTitle(basePath_);
     resize(QSize(1280,600));
 
     connect(record_,SIGNAL(clicked()),this,SLOT(onRecord()));
     connect(camPos_,SIGNAL(valueChanged(int)),this,SLOT(onSliderMove(int)));
     connect(vsource_,SIGNAL(framesReady()),this,SLOT(onNewFrame()));
     connect(settings_,SIGNAL(clicked()),this,SLOT(onSettingsClick()));
+    connect(shortcut_,SIGNAL(activated()),record_,SIGNAL(clicked()));
 
     vsource_->start();
 }
@@ -98,12 +107,18 @@ void QMainWindow::onRecord(){
 void QMainWindow::onSettingsClick(){
     vsource_->pause();
 
-    if(settingsWindow_->exec()){
+    int result = settingsWindow_->exec();
+
+    if(result == QDialog::Accepted){
+
         framesCounter_ = settingsWindow_->getFrameCount();
+
         if (settingsWindow_->isDirChanged()){
             basePath_ = settingsWindow_->getPath();
             totalCounter_ = 0;
+            setWindowTitle(basePath_);
         }
+
 
         QString path = settingsWindow_->getMarkupPath();
         if(!path.isNull()){
@@ -143,19 +158,48 @@ void QMainWindow::onNewFrame()
        memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*sizeof(short));
        memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
 
+    lock_.unlock();
+
        lastRGB_ = QImage(locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
        lastDepth_ = QImage(locBufferGrey_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
 
-    lock_.unlock();
 
     if (currentCounter_ > 0){
 
-        lastDepth_.save(currentPath_ + "/imDepth" + QString::number(currentCounter_) + ".png");
+        BadImageDetector::State result = detector_->checkImage(locBufferDepth_);
 
-        QString path = currentPath_ +  "/ImDepthOrig" + QString::number(currentCounter_) + ".png";
+        if(currentCounter_ == framesCounter_){
+
+            vsource_->pause();
+
+            screenshotDisplay_->setLocation(currentPath_);
+            screenshotDisplay_->setImageSource(&lastDepth_,result);
+
+            screenshotDisplay_->exec();
+
+            vsource_->resume();
+        }
+
+        QString suffix = "";
+
+        switch(result){
+        case BadImageDetector::GOOD:
+            suffix ="";
+            break;
+        case BadImageDetector::TOO_FAR:
+            suffix ="TF";
+            break;
+        case BadImageDetector::TOO_NEAR:
+            suffix = "TN";
+            break;
+        }
+
+        lastDepth_.save(currentPath_ + "/imDepth" + suffix + QString::number(currentCounter_) + ".png");
+
+        QString path = currentPath_ +  "/ImDepthOrig" + suffix + QString::number(currentCounter_) + ".png";
         ImageRecorder::saveDepth(path.toLatin1().data(),locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
 
-        path = currentPath_ + "/ImRGB" + QString::number(currentCounter_) + ".png";
+        path = currentPath_ + "/ImRGB" + suffix + QString::number(currentCounter_) + ".png";
 
         ImageRecorder::saveRGB(path.toLatin1().data(),locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
 

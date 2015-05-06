@@ -10,7 +10,7 @@ set(CMAKE_INSTALL_PREFIX ${HOME}/bin)
 
 set(OpenCV_DIR "C:/openCV/custom_build/")
 
-set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.0.2/5.0.2/msvc2010/")
+set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.2.1/5.2.1/msvc2010/")
 
 #everything else
 find_package(OpenCV REQUIRED)

@@ -4,8 +4,9 @@
 int main(int argc, char **argv){
 
      QApplication a(argc, argv);
+     ResourceStorage s(argv[0]);
 
-     QMainWindow w;
+     QMainWindow w(s);
 
      w.show();
 
