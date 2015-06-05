@@ -1,6 +1,6 @@
 cmake_minimum_required(VERSION 2.8)
 
-project(KinectQTRecorders)
+project(KinectQTRecorderPlot)
 
 set(HOME ${CMAKE_CURRENT_SOURCE_DIR})
 
@@ -8,14 +8,17 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_INSTALL_PREFIX ${HOME}/bin)
 
-set(OpenCV_DIR "C:/openCV/custom_build/")
+set(OpenCV_DIR "C:/OpenCV/openni-qt5.4.1-vc2010-build/")
 
-set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.2.1/5.2.1/msvc2010/")
+set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.4.1/5.4/msvc2010_opengl/")
 
 #everything else
 find_package(OpenCV REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Multimedia REQUIRED)
+#Added for plotting
+find_package(Qt5OpenGL REQUIRED)
+find_package(OpenGL REQUIRED)
 
 add_definitions(${Qt5Widgets_DEFINITIONS})
 add_definitions(${Qt5Multimedia_DEFINITIONS})

@@ -1,5 +1,4 @@
-
-set(EXEC recorder)
+set(EXEC recorderplot)
 set(RESOURCES Bad.png
               Ok.png
               boing.wav
@@ -18,7 +17,8 @@ set(SOURCE main.cpp
            badimagedetector.cpp
            screenshotdisplay.cpp
            resourcestorage.cpp
- )
+           plotwidget.cpp
+)
 
 set(QT_HEADERS ${INCLUDE_DIR}/qmainwindow.h
                ${INCLUDE_DIR}/qvideosurface.h
@@ -29,6 +29,7 @@ set(QT_HEADERS ${INCLUDE_DIR}/qmainwindow.h
                ${INCLUDE_DIR}/badimagedetector.h
                ${INCLUDE_DIR}/screenshotdisplay.h
                ${INCLUDE_DIR}/resourcestorage.h
+               ${INCLUDE_DIR}/plotwidget.h
 )
 
 set(ST_HEADERS ${INCLUDE_DIR}/kinectmotor.h)
@@ -37,9 +38,11 @@ QT5_WRAP_CPP(QT_HEADERS_MOC ${QT_HEADERS}) #run MOC
 
 add_executable(${EXEC} ${SOURCE} ${QT_HEADERS_MOC} ${ST_HEADERS} ${QT_HEADERS})
 
+#Added for plotting
+qt5_use_modules(${EXEC} Widgets OpenGL Multimedia)
+
 #target_link_libraries(${EXEC} QtMultimediaKit QtGui OpenNI ${OpenCV_LIBS})
-target_link_libraries(${EXEC} ${Qt5Widgets_LIBRARIES} ${Qt5Multimedia_LIBRARIES} OpenNI ${OpenCV_LIBS} ${IntelSDK_LIBS} ${IntelCW_LIB})
+target_link_libraries(${EXEC} ${Qt5Widgets_LIBRARIES} ${Qt5Multimedia_LIBRARIES} OpenNI ${OpenCV_LIBS} ${OPENGL_LIBRARY})
 
 install(TARGETS ${EXEC} DESTINATION .)
 install(FILES ${RESOURCES} DESTINATION .)
-

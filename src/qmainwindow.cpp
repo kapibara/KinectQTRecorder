@@ -1,5 +1,6 @@
 #include "qmainwindow.h"
 #include "imagerecorder.h"
+#include "plotwidget.h"
 
 #include <QApplication>
 #include <QBoxLayout>
@@ -17,6 +18,14 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
     framesCounter_ = 5;
     basePath_ = QDir::currentPath();
 
+    //Camera Calibration Init
+    camera_calib_para.far_plane = 6000.0;
+    camera_calib_para.near_plane = 0.1;
+    camera_calib_para.cx = 314.649173;
+    camera_calib_para.cy = 240.160459;
+    camera_calib_para.fx = 572.882768;
+    camera_calib_para.fy = 542.739980;
+
     totalCounter_ = 0;
     currentCounter_ = 0;
 
@@ -29,9 +38,14 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
     settings_ = new QPushButton();
     settings_->setText(tr("Settings"));
 
+    plotButton = new QPushButton();
+    plotButton->setText(tr("Plot"));
+
+    newplotwidget = new PlotWidget();
+
     motor_ = new KinectMotor();
 
-    settingsWindow_ = new QSettingsWindow(this,framesCounter_,basePath_);
+    settingsWindow_ = new QSettingsWindow(this,framesCounter_,basePath_,camera_calib_para.cx,camera_calib_para.cy,camera_calib_para.fx,camera_calib_para.fy,camera_calib_para.near_plane,camera_calib_para.far_plane);
     settingsWindow_->setModal(true);
 
     screenshotDisplay_ = new QScreenshotDisplay(s.getResourceLocation(),this);
@@ -48,7 +62,7 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
 
     detector_ = new BadImageDetector();
 
-/*
+    /*
     while(!motor_->open())
     {
         if(motor_->isNoDeviceError()){
@@ -75,6 +89,7 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
 
     clayout->addWidget(camPos_);
     clayout->addWidget(record_);
+    clayout->addWidget(plotButton);
     clayout->addWidget(settings_);
 
     QBoxLayout *mlayout = new QBoxLayout(QBoxLayout::TopToBottom); //main
@@ -91,6 +106,10 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
     connect(vsource_,SIGNAL(framesReady()),this,SLOT(onNewFrame()));
     connect(settings_,SIGNAL(clicked()),this,SLOT(onSettingsClick()));
     connect(shortcut_,SIGNAL(activated()),record_,SIGNAL(clicked()));
+    connect(plotButton,SIGNAL(clicked()),this,SLOT(showPlot()));
+    connect(this,SIGNAL(setCalibrationSettings(CameraCalib)),newplotwidget,SLOT(getCalibrationSettings(CameraCalib)));
+    connect(newplotwidget,SIGNAL(closeplotwidget()),this,SLOT(triggerplotwidgetclosed()));
+    connect(this,SIGNAL(sendImageData(uchar*, ushort*, int, int)),newplotwidget,SLOT(receiveImageData(uchar*, ushort*, int, int)));
 
     vsource_->start();
 }
@@ -128,8 +147,31 @@ void QMainWindow::onSettingsClick(){
         }else{
             rgbVideo_->setMarkup(0);
         }
+
+        camera_calib_para.cx = settingsWindow_->getPrinciplePoint().first;
+        camera_calib_para.cy = settingsWindow_->getPrinciplePoint().second;
+        camera_calib_para.fx = settingsWindow_->getFocalLength().first;
+        camera_calib_para.fy = settingsWindow_->getFocalLength().second;
+        camera_calib_para.near_plane = settingsWindow_->getNearFarPlane().first;
+        camera_calib_para.far_plane = settingsWindow_->getNearFarPlane().second;
+        emit setCalibrationSettings(camera_calib_para);
+        emit sendImageData(locBufferRGB_,locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
     }
 
+    vsource_->resume();
+}
+
+void QMainWindow::showPlot()
+{
+    vsource_->pause();
+    emit setCalibrationSettings(camera_calib_para);
+    emit sendImageData(locBufferRGB_,locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
+    newplotwidget->resize(640,480);
+    newplotwidget->show();
+}
+
+void QMainWindow::triggerplotwidgetclosed()
+{
     vsource_->resume();
 }
 
@@ -154,14 +196,14 @@ void QMainWindow::onNewFrame()
 
     lock_.lock();
 
-       memcpy(locBufferRGB_,vsource_->getRGBBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
-       memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*sizeof(short));
-       memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
+    memcpy(locBufferRGB_,vsource_->getRGBBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
+    memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*sizeof(short));
+    memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
 
     lock_.unlock();
 
-       lastRGB_ = QImage(locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
-       lastDepth_ = QImage(locBufferGrey_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
+    lastRGB_ = QImage(locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
+    lastDepth_ = QImage(locBufferGrey_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
 
 
     if (currentCounter_ > 0){
