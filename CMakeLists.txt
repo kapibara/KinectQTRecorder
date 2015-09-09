@@ -8,9 +8,9 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_INSTALL_PREFIX ${HOME}/bin)
 
-set(OpenCV_DIR "C:/OpenCV/openni-qt5.4.1-vc2010-build/")
+set(OpenCV_DIR "C:/openCV/custom_build/")
 
-set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.4.1/5.4/msvc2010_opengl/")
+#set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.4.1/5.4/msvc2010_opengl/")
 
 #everything else
 find_package(OpenCV REQUIRED)
