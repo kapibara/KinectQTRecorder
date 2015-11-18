@@ -2,18 +2,9 @@
 #ifndef CAMERACALIB_H
 #define CAMERACALIB_H
 
-class CameraCalib
-{
+#include <vector>
+#include <array>
 
-public:
-    //Calibration
-    float far_plane;
-    float near_plane;
-    float cx;
-    float cy;
-    float fx;
-    float fy;
-};
 
 #endif // CAMERACALIBH
 
@@ -23,38 +14,59 @@ public:
 
 #include <QGLWidget>
 #include <QKeyEvent>
-#include <QDebug>
-#include <GL/glu.h>
-#include <time.h>
 #include <QVector3D>
+#include <QDebug>
+
+#include <GL/glu.h>
+
+#include <time.h>
 #include <math.h>
-#include <opencv2/core/core.hpp>
-#include <opencv2/highgui/highgui.hpp>
-#include <opencv2/imgproc/imgproc.hpp>
+#include <tuple>
+
+#include "bufferwrapper.h"
 
 class PlotWidget : public QGLWidget
 {
     Q_OBJECT
 public:
-    explicit PlotWidget(QWidget *parent = 0);
-    ~PlotWidget();
+    PlotWidget(QWidget *parent = 0);
+
+    void setModal(bool modal){
+        if(modal){
+            setWindowModality(Qt::WindowModal);
+        }else{
+            setWindowModality(Qt::NonModal);
+        }
+    }
+
+    void setNearFarPlanes(float np, float fp){
+        near_plane_ = np;
+        far_plane_ = fp;
+    }
+
+    /*this function is used to populate point cloud*/
+    pc &getPCReference()
+    {
+        return points_rgb_depth_list_;
+    }
 
 protected:
     void initializeGL(); //sets up resources needed by the OpenGL implementation to render the scene. called once if QGLWidget was created
     void paintGL(); //performs painting operations using OpenGL calls. called if updateGL() was called
     void resizeGL(int w, int h); // resizes the viewport so that the rendered scene fits onto the widget, and sets up a projection matrix to map 3D coordinates to 2D viewport coordinates. called at beginning and when the window resized
     void mouseMoveEvent(QMouseEvent *event);
+    void mousePressEvent(QMouseEvent *event);
     void keyPressEvent(QKeyEvent *event);
     void wheelEvent(QWheelEvent *event);
     void hideEvent(QHideEvent *event); // Reset all the object transformation and hide the PlotWidget
-    void calculate3DPoints(); //Calculate MidDepth and 3D Points
+   // void calculate3DPoints(); //Calculate MidDepth and 3D Points
 
-    //3D Points container
-    QList<QPair<QPair<float,float>,QPair<float, QRgb> > > points_rgb_depth_list;
+    //3D Points container (point : color)
+    pc points_rgb_depth_list_;
 
     //Container for the Buffers that are received from qmainwindow
-    cv::Mat depth_mat;
-    QImage rgb_pic;
+    BufferWrapper<ushort,1> depth_;
+    BufferWrapper<uchar,3>  rgb_;
 
 private:
     //last Pos is used for Rotating the object with mouse
@@ -69,9 +81,9 @@ private:
     float translation_z;
 
     //Camera Calibration Parameter
-    float far_plane, near_plane;
-    float cx, cy; //principle point
-    float fx, fy; //focal length
+    float far_plane_, near_plane_;
+    //float cx, cy; //principle point
+    //float fx, fy; //focal length
 
     //Used to determine the MidPoint of the Z-Axis
     float minpointZ;
@@ -82,10 +94,10 @@ private:
     void transformObject();
     void drawObject();
 
-public slots:
+//public slots:
     //slot used to get the Settings and Image Data from qmainwindow
-    void getCalibrationSettings(CameraCalib camera_parameter);
-    void receiveImageData(uchar* BufferRGB, ushort *BufferDepth, int image_width, int image_height);
+    //void setCalibrationSettings(CameraCalib camera_parameter);
+    //void setImageData(uchar* BufferRGB, ushort *BufferDepth, int image_width, int image_height);
 
 signals:
     //send a signal that the plot window is closed to qmainwindow

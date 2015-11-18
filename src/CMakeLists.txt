@@ -10,7 +10,7 @@ set(SOURCE main.cpp
            qmainwindow.cpp
            qvideowidget.cpp
            qvideosurface.cpp
-           kinectmotor.cpp
+           #kinectmotor.cpp
            qvideosource.cpp
            qsettingswindow.cpp
            imagerecorder.cpp
@@ -18,6 +18,8 @@ set(SOURCE main.cpp
            screenshotdisplay.cpp
            resourcestorage.cpp
            plotwidget.cpp
+           syncqueue.cpp
+           serializerthread.cpp
 )
 
 set(QT_HEADERS ${INCLUDE_DIR}/qmainwindow.h
@@ -30,9 +32,11 @@ set(QT_HEADERS ${INCLUDE_DIR}/qmainwindow.h
                ${INCLUDE_DIR}/screenshotdisplay.h
                ${INCLUDE_DIR}/resourcestorage.h
                ${INCLUDE_DIR}/plotwidget.h
+               ${INCLUDE_DIR}/syncqueue.h
+               ${INCLUDE_DIR}/serializerthread.h
 )
 
-set(ST_HEADERS ${INCLUDE_DIR}/kinectmotor.h)
+#set(ST_HEADERS ${INCLUDE_DIR}/kinectmotor.h)
 
 QT5_WRAP_CPP(QT_HEADERS_MOC ${QT_HEADERS}) #run MOC
 
@@ -41,8 +45,7 @@ add_executable(${EXEC} ${SOURCE} ${QT_HEADERS_MOC} ${ST_HEADERS} ${QT_HEADERS})
 #Added for plotting
 qt5_use_modules(${EXEC} Widgets OpenGL Multimedia)
 
-#target_link_libraries(${EXEC} QtMultimediaKit QtGui OpenNI ${OpenCV_LIBS})
-target_link_libraries(${EXEC} ${Qt5Widgets_LIBRARIES} ${Qt5Multimedia_LIBRARIES} OpenNI ${OpenCV_LIBS} ${OPENGL_LIBRARY})
+target_link_libraries(${EXEC} ${KINECT2_LIBS} ${Qt5Widgets_LIBRARIES} ${Qt5Multimedia_LIBRARIES} ${OPENGL_LIBRARY} ${LIBPNG_LIBS})
 
 install(TARGETS ${EXEC} DESTINATION .)
 install(FILES ${RESOURCES} DESTINATION .)

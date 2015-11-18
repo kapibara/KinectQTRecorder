@@ -14,6 +14,7 @@ QScreenshotDisplay::QScreenshotDisplay(const QString &resLocation, QWidget *pare
 
     okImage_ = new QImage();
     okImage_->load(resLocation + "Ok.png");
+    std::cerr << "load resources from: " << resLocation.toStdString() <<std::endl;
     badImage_ = new QImage();
     badImage_->load(resLocation + "Bad.png");
 

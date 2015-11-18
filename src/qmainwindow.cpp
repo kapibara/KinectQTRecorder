@@ -1,6 +1,7 @@
 #include "qmainwindow.h"
 #include "imagerecorder.h"
 #include "plotwidget.h"
+#include "serializerthread.h"
 
 #include <QApplication>
 #include <QBoxLayout>
@@ -16,24 +17,22 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
 {
     /*default values*/
     framesCounter_ = 5;
+    videobufferSize_ = 100;
     basePath_ = QDir::currentPath();
 
-    //Camera Calibration Init
-    camera_calib_para.far_plane = 6000.0;
-    camera_calib_para.near_plane = 0.1;
-    camera_calib_para.cx = 314.649173;
-    camera_calib_para.cy = 240.160459;
-    camera_calib_para.fx = 572.882768;
-    camera_calib_para.fy = 542.739980;
-
     totalCounter_ = 0;
-    currentCounter_ = 0;
 
     rgbVideo_ = new QVideoWidget(this);
+    rgbVideo_->setMaximumSize(QSize(640,480));
+
     depthVideo_ = new QVideoWidget(this);
+    depthVideo_->setMaximumSize(QSize(640,480));
 
     record_ = new QPushButton();
     record_->setText(tr("Record"));
+
+    recordVideo_ = new QPushButton();
+    recordVideo_->setText(tr("Record Video"));
 
     settings_ = new QPushButton();
     settings_->setText(tr("Settings"));
@@ -41,44 +40,41 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
     plotButton = new QPushButton();
     plotButton->setText(tr("Plot"));
 
-    newplotwidget = new PlotWidget();
-
-    motor_ = new KinectMotor();
-
-    settingsWindow_ = new QSettingsWindow(this,framesCounter_,basePath_,camera_calib_para.cx,camera_calib_para.cy,camera_calib_para.fx,camera_calib_para.fy,camera_calib_para.near_plane,camera_calib_para.far_plane);
-    settingsWindow_->setModal(true);
+    plot3Dwidget_ = new PlotWidget(this);
+    plot3Dwidget_->setModal(true);
 
     screenshotDisplay_ = new QScreenshotDisplay(s.getResourceLocation(),this);
     screenshotDisplay_->setModal(true);
 
-    camPos_ = new QSlider(Qt::Horizontal,this);
-    camPos_->setRange(-31,31);
-    camPos_->setSingleStep(1);
-
     shortcut_ = new QShortcut(this);
     shortcut_->setKey(Qt::Key_Tab);
 
-    camPos_->setValue(0);
-
     detector_ = new BadImageDetector();
 
-    /*
-    while(!motor_->open())
-    {
-        if(motor_->isNoDeviceError()){
-            QMessageBox::information(0,"No device connected","No device found.\n The application will be closed.");
-            exit(-1);
-        }
-        motor_->move(0);
-//        sleep(1);
-    }*/
+    vsource_ = new QVideoSource(lock_);
 
-    pause_ = false;
-    vsource_ = new QVideoSource(lock_,pause_);
+    intrinsics_ = vsource_->getDepthIntrinsics();
+    nearPlane_ = 0.1f;
+    farPlane_ = 6000.0f;
 
-    locBufferRGB_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
-    locBufferGrey_ = new uchar[vsource_->getFrameWidth()*vsource_->getFrameHeight()*3];
-    locBufferDepth_ = new unsigned short[vsource_->getFrameWidth()*vsource_->getFrameHeight()];
+    settingsWindow_ = new QSettingsWindow(this,
+                                          framesCounter_,
+                                          videobufferSize_,
+                                          basePath_,
+                                          intrinsics_.cx_,
+                                          intrinsics_.cy_,
+                                          intrinsics_.fx_,
+                                          intrinsics_.fy_,
+                                          nearPlane_,farPlane_);
+    settingsWindow_->setModal(true);
+
+    int channelSizeRGB = vsource_->getFrameWidth(Kinect2VideoSource::ImageType::IMAGE_RGB)*vsource_->getFrameHeight(Kinect2VideoSource::ImageType::IMAGE_RGB);
+    int channelSizeDepth = vsource_->getFrameWidth(Kinect2VideoSource::ImageType::IMAGE_DEPTH)*vsource_->getFrameHeight(Kinect2VideoSource::ImageType::IMAGE_DEPTH);
+    int channelSizeIr = vsource_->getFrameWidth(Kinect2VideoSource::ImageType::IMAGE_IR)*vsource_->getFrameHeight(Kinect2VideoSource::ImageType::IMAGE_IR);
+
+    locBufferRGB_ = new uchar[vsource_->getRGBPixelSize()*channelSizeRGB];
+    locBufferDepth_ = new unsigned short[channelSizeDepth];
+    locBufferIR_ =  new unsigned short[channelSizeIr];
 
     QBoxLayout *vlayout = new QBoxLayout(QBoxLayout::LeftToRight); //videos
 
@@ -87,8 +83,9 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
 
     QBoxLayout *clayout = new QBoxLayout(QBoxLayout::LeftToRight); //control
 
-    clayout->addWidget(camPos_);
+    //clayout->addWidget(camPos_);
     clayout->addWidget(record_);
+    clayout->addWidget(recordVideo_);
     clayout->addWidget(plotButton);
     clayout->addWidget(settings_);
 
@@ -101,25 +98,99 @@ QMainWindow::QMainWindow(ResourceStorage &s,QWidget *parent): QWidget(parent)
     setWindowTitle(basePath_);
     resize(QSize(1280,600));
 
+    serithread_ = nullptr;
+    isrecording_ = false;
+
     connect(record_,SIGNAL(clicked()),this,SLOT(onRecord()));
-    connect(camPos_,SIGNAL(valueChanged(int)),this,SLOT(onSliderMove(int)));
+    connect(recordVideo_,SIGNAL(clicked()),this,SLOT(onRecordVideo()));
     connect(vsource_,SIGNAL(framesReady()),this,SLOT(onNewFrame()));
     connect(settings_,SIGNAL(clicked()),this,SLOT(onSettingsClick()));
     connect(shortcut_,SIGNAL(activated()),record_,SIGNAL(clicked()));
-    connect(plotButton,SIGNAL(clicked()),this,SLOT(showPlot()));
-    connect(this,SIGNAL(setCalibrationSettings(CameraCalib)),newplotwidget,SLOT(getCalibrationSettings(CameraCalib)));
-    connect(newplotwidget,SIGNAL(closeplotwidget()),this,SLOT(triggerplotwidgetclosed()));
-    connect(this,SIGNAL(sendImageData(uchar*, ushort*, int, int)),newplotwidget,SLOT(receiveImageData(uchar*, ushort*, int, int)));
+    connect(plotButton,SIGNAL(clicked()),this,SLOT(onShowPlot()));
+    connect(plot3Dwidget_,SIGNAL(closeplotwidget()),this,SLOT(onClosePlot()));
 
     vsource_->start();
+
 }
 
 void QMainWindow::onRecord(){
-    if(currentCounter_ == 0){
+
+    if(!isrecording_){
+        isrecording_ = true;
+        record_->setEnabled(false);
+        recordVideo_->setEnabled(false);
+
+        BadImageDetector::State result = detector_->checkImage(locBufferDepth_);
+
+        if(result != BadImageDetector::GOOD){
+            vsource_->pause();
+            currentPath_ = basePath_ + "/rBAD" + QString::number(totalCounter_) + "/";
+            screenshotDisplay_->setLocation(currentPath_);
+            screenshotDisplay_->setImageSource(&lastDepth_,result);
+            screenshotDisplay_->exec();
+            vsource_->resume();
+       }else{
+            currentPath_ = basePath_ + "/r" + QString::number(totalCounter_) + "/";
+        }
+
         totalCounter_++;
-        currentCounter_ = framesCounter_;
-        currentPath_ = basePath_ + "/r" + QString::number(totalCounter_) + "/";
         QDir().mkdir(currentPath_);
+
+        serithread_ = new QSerializerThread(currentPath_,framesCounter_,
+                                        vsource_->getFrameSize(Kinect2VideoSource::ImageType::IMAGE_RGB),
+                                        vsource_->getFrameSize(Kinect2VideoSource::ImageType::IMAGE_DEPTH),
+                                        vsource_->getFrameSize(Kinect2VideoSource::ImageType::IMAGE_IR));
+
+        serithread_->setMaxFramesToSave(framesCounter_);
+
+        connect(serithread_,SIGNAL(finished()),this,SLOT(onSeriThreadFinished()));
+
+
+        vsource_->setQueue(serithread_->getQueue());
+        serithread_->start();
+    }
+
+}
+
+void QMainWindow::onSeriThreadFinished(){
+    /*in case the queue is not unset (i.e. the thread is called from record and not from record video*/
+    vsource_->unsetQueue();
+
+    if(serithread_!= nullptr){
+        delete serithread_;
+        serithread_ = nullptr;
+    }
+    isrecording_ = false;
+    recordVideo_->setEnabled(true);
+    recordVideo_->setText(tr("Record Video"));
+    record_->setEnabled(true);
+}
+
+void QMainWindow::onRecordVideo(){
+    if(!isrecording_){
+        isrecording_ = true;
+        record_->setEnabled(false);
+        recordVideo_->setText(tr("Stop"));
+        currentPath_ = basePath_ + "/r" + QString::number(totalCounter_) + "/";
+        totalCounter_++;
+
+
+        QDir().mkdir(currentPath_);
+
+        serithread_ = new QSerializerThread(currentPath_,videobufferSize_,
+                                        vsource_->getFrameSize(Kinect2VideoSource::ImageType::IMAGE_RGB),
+                                        vsource_->getFrameSize(Kinect2VideoSource::ImageType::IMAGE_DEPTH),
+                                        vsource_->getFrameSize(Kinect2VideoSource::ImageType::IMAGE_IR));
+        connect(serithread_,SIGNAL(finished()),this,SLOT(onSeriThreadFinished()));
+
+
+        vsource_->setQueue(serithread_->getQueue());
+        serithread_->start();
+    }else{
+        vsource_->unsetQueue();
+        recordVideo_->setEnabled(false);
+        recordVideo_->setText(tr("Dumping bufferized frames"));
+        serithread_->stopAfterQueueEmpty();
     }
 }
 
@@ -131,6 +202,7 @@ void QMainWindow::onSettingsClick(){
     if(result == QDialog::Accepted){
 
         framesCounter_ = settingsWindow_->getFrameCount();
+        videobufferSize_ = settingsWindow_->getVBCount();
 
         if (settingsWindow_->isDirChanged()){
             basePath_ = settingsWindow_->getPath();
@@ -148,47 +220,35 @@ void QMainWindow::onSettingsClick(){
             rgbVideo_->setMarkup(0);
         }
 
-        camera_calib_para.cx = settingsWindow_->getPrinciplePoint().first;
-        camera_calib_para.cy = settingsWindow_->getPrinciplePoint().second;
-        camera_calib_para.fx = settingsWindow_->getFocalLength().first;
-        camera_calib_para.fy = settingsWindow_->getFocalLength().second;
-        camera_calib_para.near_plane = settingsWindow_->getNearFarPlane().first;
-        camera_calib_para.far_plane = settingsWindow_->getNearFarPlane().second;
-        emit setCalibrationSettings(camera_calib_para);
-        emit sendImageData(locBufferRGB_,locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
+        intrinsics_.cx_ = settingsWindow_->getPrinciplePoint().first;
+        intrinsics_.cy_ = settingsWindow_->getPrinciplePoint().second;
+        intrinsics_.fx_ = settingsWindow_->getFocalLength().first;
+        intrinsics_.fy_ = settingsWindow_->getFocalLength().second;
+        nearPlane_ = settingsWindow_->getNearFarPlane().first;
+        farPlane_ = settingsWindow_->getNearFarPlane().second;
     }
 
     vsource_->resume();
 }
 
-void QMainWindow::showPlot()
+void QMainWindow::onShowPlot()
 {
     vsource_->pause();
-    emit setCalibrationSettings(camera_calib_para);
-    emit sendImageData(locBufferRGB_,locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
-    newplotwidget->resize(640,480);
-    newplotwidget->show();
+
+    lock_.lock();
+    plot3Dwidget_->getPCReference().clear();
+    vsource_->createPC(plot3Dwidget_->getPCReference());
+    lock_.unlock();
+
+    std::cerr <<"list length: " << plot3Dwidget_->getPCReference().size() << std::endl;
+
+    plot3Dwidget_->resize(640,480);
+    plot3Dwidget_->show();
 }
 
-void QMainWindow::triggerplotwidgetclosed()
+void QMainWindow::onClosePlot()
 {
-    vsource_->resume();
-}
-
-void QMainWindow::onSliderMove(int newValue){
-    if (motor_->isOpened())
-    {
-        motor_->move(newValue);
-    }
-    else{
-        if (motor_->open()){
-            motor_->move(newValue);
-        }else{
-            cerr << "Unable to connect to the motor" << endl;
-
-            camPos_->setValue(0);
-        }
-    }
+     vsource_->resume();
 }
 
 void QMainWindow::onNewFrame()
@@ -196,67 +256,23 @@ void QMainWindow::onNewFrame()
 
     lock_.lock();
 
-    memcpy(locBufferRGB_,vsource_->getRGBBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
-    memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*sizeof(short));
-    memcpy(locBufferGrey_,vsource_->getScaledDepthBuffer(),vsource_->getFrameWidth()*vsource_->getFrameHeight()*3);
+        lastRGB_ = vsource_->getLastRGB();
+        lastDepth_ = vsource_->getLastDepth();
+
+        size_t pixels = vsource_->getFrameWidth(Kinect2VideoSource::ImageType::IMAGE_DEPTH)*vsource_->getFrameHeight(Kinect2VideoSource::ImageType::IMAGE_DEPTH);
+
+        memcpy(locBufferDepth_,vsource_->getOriginalDepthBuffer(),pixels);
 
     lock_.unlock();
-
-    lastRGB_ = QImage(locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
-    lastDepth_ = QImage(locBufferGrey_,vsource_->getFrameWidth(),vsource_->getFrameHeight(),QImage::Format_RGB888);
-
-
-    if (currentCounter_ > 0){
-
-        BadImageDetector::State result = detector_->checkImage(locBufferDepth_);
-
-        if(currentCounter_ == framesCounter_){
-
-            vsource_->pause();
-
-            screenshotDisplay_->setLocation(currentPath_);
-            screenshotDisplay_->setImageSource(&lastDepth_,result);
-
-            screenshotDisplay_->exec();
-
-            vsource_->resume();
-        }
-
-        QString suffix = "";
-
-        switch(result){
-        case BadImageDetector::GOOD:
-            suffix ="";
-            break;
-        case BadImageDetector::TOO_FAR:
-            suffix ="TF";
-            break;
-        case BadImageDetector::TOO_NEAR:
-            suffix = "TN";
-            break;
-        }
-
-        lastDepth_.save(currentPath_ + "/imDepth" + suffix + QString::number(currentCounter_) + ".png");
-
-        QString path = currentPath_ +  "/ImDepthOrig" + suffix + QString::number(currentCounter_) + ".png";
-        ImageRecorder::saveDepth(path.toLatin1().data(),locBufferDepth_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
-
-        path = currentPath_ + "/ImRGB" + suffix + QString::number(currentCounter_) + ".png";
-
-        ImageRecorder::saveRGB(path.toLatin1().data(),locBufferRGB_,vsource_->getFrameWidth(),vsource_->getFrameHeight());
-
-        currentCounter_--;
-    }
 
     QVideoFrame rgbFrame(lastRGB_);
     QVideoFrame depthFrame(lastDepth_);
 
     if (rgbVideo_->videoSurface()->surfaceFormat().pixelFormat()!=rgbFrame.pixelFormat()){
         QVideoSurfaceFormat rgbformat(rgbFrame.size(), rgbFrame.pixelFormat());
-
         rgbVideo_->videoSurface()->start(rgbformat);
-        QVideoSurfaceFormat depthformat(depthFrame.size(), depthFrame.pixelFormat());
 
+        QVideoSurfaceFormat depthformat(depthFrame.size(), depthFrame.pixelFormat());
         depthVideo_->videoSurface()->start(depthformat);
     }
 

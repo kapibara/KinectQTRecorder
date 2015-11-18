@@ -8,12 +8,19 @@ set(CMAKE_BUILD_TYPE Release)
 
 set(CMAKE_INSTALL_PREFIX ${HOME}/bin)
 
-set(OpenCV_DIR "C:/openCV/custom_build/")
+set(KINECT_SDK_PATH "C:/Program Files/Microsoft SDKs/Kinect/v2.0-PublicPreview1408")
+set(KINECT2_WRAPPER_PATH C:/Data/Development/CPP/Kinect2CameraInterface)
 
-#set(CMAKE_PREFIX_PATH "C:/Qt/Qt5.4.1/5.4/msvc2010_opengl/")
+set(KINECT2_LIB_DIR ${KINECT2_WRAPPER_PATH}/lib)
+set(KINECT2_INCLUDE_DIR ${KINECT2_WRAPPER_PATH}/include)
+set(KINECT2_LIBS libkinect2 Kinect20) #first is the wrapper lib, second is SDK lib
+
+set(LIBPNG "C:/Program Files (x86)/GnuWin32/")
+set(LIBPNG_LIB_DIR ${LIBPNG}/lib)
+set(LIBPNG_INCLUDE_DIR ${LIBPNG}/include)
+set(LIBPNG_LIBS libpng zlibstat)
 
 #everything else
-find_package(OpenCV REQUIRED)
 find_package(Qt5Widgets REQUIRED)
 find_package(Qt5Multimedia REQUIRED)
 #Added for plotting
@@ -23,17 +30,16 @@ find_package(OpenGL REQUIRED)
 add_definitions(${Qt5Widgets_DEFINITIONS})
 add_definitions(${Qt5Multimedia_DEFINITIONS})
 
-set(OPENNI_INCLUDE "C:/Program Files (x86)/OpenNI/Include/")
-set(OPENNI_LIBS "C:/Program Files (x86)/OpenNI/Lib")
-
 include_directories(${HOME}/include)
-include_directories(${OpenCV_INCLUDE_DIRS})
+include_directories(${KINECT2_INCLUDE_DIR})
+include_directories(${LIBPNG_INCLUDE_DIR})
+include_directories(${KINECT_SDK_PATH}/inc)
 include_directories(${Qt5Widgets_INCLUDE_DIRS})
 include_directories(${Qt5Multimedia_INCLUDE_DIRS})
-include_directories(${OPENNI_INCLUDE})
 
-link_directories(${OpenCV_INCLUDE_DIRS})
-link_directories(${OPENNI_LIBS})
+link_directories(${KINECT2_LIB_DIR})
+link_directories(${LIBPNG_LIB_DIR})
+link_directories(${KINECT_SDK_PATH}/Lib/x86)
 
 add_subdirectory(${HOME}/src)
 

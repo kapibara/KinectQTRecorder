@@ -1,7 +1,7 @@
 #ifndef MOTORCONTROL_H
 #define MOTORCONTROL_H
+//#include <XnUSB.h>
 
-#include <XnUSB.h>
 
 class KinectMotor
 {

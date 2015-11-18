@@ -9,6 +9,8 @@
 #include <QWidget>
 #include <QAbstractVideoSurface>
 
+#include "kinect2videosource.h"
+
 class QVideoSurface : public QAbstractVideoSurface
 {
     Q_OBJECT
